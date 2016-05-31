@@ -24,7 +24,7 @@ namespace FRLib
         public int recognize(Mat image)
         {
             if (image == null) return -1;
-            IEnumerable<string> files = Directory.EnumerateFiles(dataDirectory, "?.lbph");
+            IEnumerable<string> files = Directory.EnumerateFiles(dataDirectory, "*.lbph");
             List<int> users = new List<int>();
             foreach(string file in files)
             {
