@@ -4,6 +4,7 @@ using Emgu.CV;
 using Emgu.CV.Face;
 using Emgu.CV.Util;
 using System.IO;
+using System.IO.Compression;
 
 namespace FRLib
 {
@@ -15,6 +16,7 @@ namespace FRLib
         public int GridX { get; set; } = 8;
         public int GridY { get; set; } = 8;
         public double Threshold { get; set; } = double.MaxValue;
+        public bool Compression { get; set; } = false;
 
         public LBPHUserFaceRecognizer(string dataDirectory)
         {
@@ -25,11 +27,12 @@ namespace FRLib
         {
             if (image == null) return -1;
             Directory.CreateDirectory(DataDirectory);
-            IEnumerable<string> files = Directory.EnumerateFiles(DataDirectory, "*.lbph");
+            string fileExtension = Compression == true ? "lbph.zip" : "lbph";
+            IEnumerable<string> files = Directory.EnumerateFiles(DataDirectory, "*."+fileExtension);
             List<int> users = new List<int>();
             foreach(string file in files)
             {
-                string[] nameParts = file.Replace(".lbph", "").Split(new char[] { '/','\\' });
+                string[] nameParts = file.Replace("."+fileExtension, "").Split(new char[] { '/','\\' });
                 int userid;
                 if (int.TryParse(nameParts[nameParts.Length-1], out userid)) users.Add(userid);
             }
@@ -44,20 +47,24 @@ namespace FRLib
             Directory.CreateDirectory(DataDirectory);
             foreach (int uid in usersToCheck)
             {
-                LBPHFaceRecognizer lbph = new LBPHFaceRecognizer(Radius,Neighbours,GridX,GridY,Threshold);
+                if (Compression) DecompressRecognizer(uid);
+                LBPHFaceRecognizer lbph = LoadRecognizer(uid);
+                if (Compression)
+                {
+                    RemoveRecognizer(uid);
+                }
                 try
                 {
-                    lbph.Load(DataDirectory + "/" + uid + ".lbph");
+                    FaceRecognizer.PredictionResult result = lbph.Predict(image);
+                    if (result.Distance != double.MaxValue && (bestUID == -1 || result.Distance < bestDistance))
+                    {
+                        bestUID = result.Label;
+                        bestDistance = result.Distance;
+                    }
                 }
-                catch (CvException)
+                catch(CvException)
                 {
-                    continue;
-                }
-                FaceRecognizer.PredictionResult result = lbph.Predict(image);
-                if(result.Distance!= double.MaxValue && (bestUID == -1 || result.Distance < bestDistance))
-                {
-                    bestUID = result.Label;
-                    bestDistance = result.Distance;
+                    //nothing to do
                 }
                 lbph.Dispose();
             }
@@ -66,22 +73,15 @@ namespace FRLib
 
         public void RemoveUserData(int userId)
         {
-            Directory.CreateDirectory(DataDirectory);
-            File.Delete(DataDirectory + "/" + userId + ".lbph");
+            RemoveRecognizer(userId);
+            RemoveCompressedRecognizer(userId);
         }
 
         public void Train(int userId, Mat image)
         {
             Directory.CreateDirectory(DataDirectory);
-            LBPHFaceRecognizer lbph =  new LBPHFaceRecognizer(Radius, Neighbours, GridX, GridY, Threshold);
-            try
-            {
-                lbph.Load(DataDirectory + "/" + userId + ".lbph");
-            }
-            catch(CvException)
-            {
-                //nothing to do - new Face Recognizer
-            }
+            if (Compression) DecompressRecognizer(userId);
+            LBPHFaceRecognizer lbph = LoadRecognizer(userId);
             VectorOfMat images = new VectorOfMat();
             images.Push(image);
             VectorOfInt labels = new VectorOfInt();
@@ -89,6 +89,73 @@ namespace FRLib
             lbph.Update(images,labels);
             lbph.Save(DataDirectory + "/" +userId + ".lbph");
             lbph.Dispose();
+            if (Compression)
+            {
+                CompressRecognizer(userId);
+                RemoveRecognizer(userId);
+            }
+        }
+
+        private LBPHFaceRecognizer LoadRecognizer(int userId)
+        {
+            LBPHFaceRecognizer lbph = new LBPHFaceRecognizer(Radius, Neighbours, GridX, GridY, Threshold);
+            try
+            {
+                lbph.Load(DataDirectory + "/" + userId + ".lbph");
+            }
+            catch (CvException)
+            {
+                //nothing to do - new Face Recognizer
+            }
+            return lbph;
+        }
+
+        private void RemoveRecognizer(int userId)
+        {
+            Directory.CreateDirectory(DataDirectory);
+            File.Delete(DataDirectory + "/" + userId + ".lbph");
+        }
+
+        private void RemoveCompressedRecognizer(int userId)
+        {
+            Directory.CreateDirectory(DataDirectory);
+            File.Delete(DataDirectory + "/" + userId + ".lbph.zip");
+        }
+
+        private void CompressRecognizer(int userId)
+        {
+            FileStream fstream = null;
+            try
+            {
+                fstream = new FileStream(DataDirectory + "/" + userId + ".lbph.zip", FileMode.OpenOrCreate);
+            }
+            catch (Exception)
+            {
+                return;
+            }
+            ZipArchive zip = null;
+            try
+            {
+                zip = new ZipArchive(fstream, ZipArchiveMode.Create, false);
+                zip.CreateEntryFromFile(DataDirectory + "/" + userId + ".lbph", "" + userId + ".lbph");
+                zip.Dispose();
+            }
+            catch(Exception)
+            {
+                fstream.Close();
+            }
+        }
+
+        private void DecompressRecognizer(int userId)
+        {
+            try
+            {
+                ZipFile.ExtractToDirectory(DataDirectory + "/" + userId + ".lbph.zip", DataDirectory+"/");
+            }
+            catch(Exception)
+            {
+                //nothing to do
+            }
         }
     }
 }
