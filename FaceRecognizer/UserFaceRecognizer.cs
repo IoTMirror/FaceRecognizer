@@ -5,9 +5,9 @@ namespace FRLib
 {
     public interface UserFaceRecognizer
     {
-        int recognize(Mat image);
-        int recognize(Mat image, List<int> usersToCheck);
-        void train(int userId, Mat image);
-        void removeUserData(int userId);
+        int Recognize(Mat image);
+        int Recognize(Mat image, List<int> usersToCheck);
+        void Train(int userId, Mat image);
+        void RemoveUserData(int userId);
     }
 }

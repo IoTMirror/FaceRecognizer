@@ -7,7 +7,7 @@ namespace FRLib
     {
         public Size OutputImageSize { get; set; } = default(Size);        
 
-        public Mat process(Mat image)
+        public Mat Process(Mat image)
         {
             if (image==null) return null;
             if (OutputImageSize.Height == 0 || OutputImageSize.Width == 0) return null;

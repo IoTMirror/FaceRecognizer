@@ -6,15 +6,15 @@ namespace FRLib
 {
     public class CascadeDetector : Detector
     {
-        public CascadeClassifier cascadeClassifier { get; set; }
-        public double scaleFactor { get; set; } = 1.1;
-        public int minNeighbours { get; set; } = 6;
-        public Size minSize { get; set; } = default(Size);
-        public Size maxSize { get; set; } = default(Size);
+        public CascadeClassifier CascadeClassifier { get; set; }
+        public double ScaleFactor { get; set; } = 1.1;
+        public int MinNeighbours { get; set; } = 6;
+        public Size MinSize { get; set; } = default(Size);
+        public Size MaxSize { get; set; } = default(Size);
 
         public CascadeDetector(CascadeClassifier cascadeClassifier)
         {
-            this.cascadeClassifier = cascadeClassifier;
+            CascadeClassifier = cascadeClassifier;
         }
 
         public List<Rectangle> Detect(Mat image)
@@ -23,7 +23,8 @@ namespace FRLib
             Mat grayImage = new Mat();
             CvInvoke.CvtColor(image, grayImage, Emgu.CV.CvEnum.ColorConversion.Bgr2Gray);
             CvInvoke.EqualizeHist(grayImage, grayImage);
-            Rectangle[] facesArray = (cascadeClassifier.DetectMultiScale(grayImage, scaleFactor, minNeighbours, minSize, maxSize));
+            Rectangle[] facesArray = (CascadeClassifier.DetectMultiScale(grayImage, ScaleFactor, MinNeighbours, MinSize, MaxSize));
+            grayImage.Dispose();
             if (facesArray.Length > 0) return new List<Rectangle>(facesArray);
             else return new List<Rectangle>();
         }
@@ -42,20 +43,34 @@ namespace FRLib
         public Mat ExtractLargest(Mat image)
         {
             List<Mat> extractedFaces = Extract(image);
-            if (extractedFaces.Count != 0)
+            Mat largest = GetLargest(extractedFaces);
+            foreach(Mat m in extractedFaces)
+            {
+                if(ReferenceEquals(largest, m)!=true)
+                {
+                    m.Dispose();
+                }
+            }
+            return largest;
+        }
+
+        public Mat GetLargest(List<Mat> images)
+        {
+            if (images == null) return null;
+            if (images.Count != 0)
             {
                 int largestI = 0;
-                int largestSize = extractedFaces[0].Size.Height * extractedFaces[0].Size.Width;
-                for (int currentI=1;currentI<extractedFaces.Count;++currentI)
+                int largestSize = images[0].Size.Height * images[0].Size.Width;
+                for (int currentI = 1; currentI < images.Count; ++currentI)
                 {
-                    int currentSize = extractedFaces[currentI].Size.Height * extractedFaces[currentI].Size.Width;
-                    if (currentSize>largestSize)
+                    int currentSize = images[currentI].Size.Height * images[currentI].Size.Width;
+                    if (currentSize > largestSize)
                     {
                         largestI = currentI;
                         largestSize = currentSize;
                     }
                 }
-                return extractedFaces[largestI];
+                return images[largestI];
             }
             else return null;
         }

@@ -9,69 +9,74 @@ namespace FRLib
 {
     public class LBPHUserFaceRecognizer : UserFaceRecognizer
     {
-        public string dataDirectory { get; set; }
-        public int radius { get; set; } = 1;
-        public int neighbours { get; set; } = 8;
-        public int gridX { get; set; } = 8;
-        public int gridY { get; set; } = 8;
-        public double threshold { get; set; } = Double.MaxValue;
+        public string DataDirectory { get; set; }
+        public int Radius { get; set; } = 1;
+        public int Neighbours { get; set; } = 8;
+        public int GridX { get; set; } = 8;
+        public int GridY { get; set; } = 8;
+        public double Threshold { get; set; } = double.MaxValue;
 
         public LBPHUserFaceRecognizer(string dataDirectory)
         {
-            this.dataDirectory = dataDirectory;
+            DataDirectory = dataDirectory;
         }
 
-        public int recognize(Mat image)
+        public int Recognize(Mat image)
         {
             if (image == null) return -1;
-            IEnumerable<string> files = Directory.EnumerateFiles(dataDirectory, "*.lbph");
+            Directory.CreateDirectory(DataDirectory);
+            IEnumerable<string> files = Directory.EnumerateFiles(DataDirectory, "*.lbph");
             List<int> users = new List<int>();
             foreach(string file in files)
             {
                 string[] nameParts = file.Replace(".lbph", "").Split(new char[] { '/','\\' });
                 int userid;
-                if (Int32.TryParse(nameParts[nameParts.Length-1], out userid)) users.Add(userid);
+                if (int.TryParse(nameParts[nameParts.Length-1], out userid)) users.Add(userid);
             }
-            return recognize(image, users);
+            return Recognize(image, users);
         }
 
-        public int recognize(Mat image, List<int> usersToCheck)
+        public int Recognize(Mat image, List<int> usersToCheck)
         {
             if (image == null) return -1;
             int bestUID = -1;
             double bestDistance=0;
-            foreach(int uid in usersToCheck)
+            Directory.CreateDirectory(DataDirectory);
+            foreach (int uid in usersToCheck)
             {
-                LBPHFaceRecognizer lbph = new LBPHFaceRecognizer(radius,neighbours,gridX,gridY,threshold);
+                LBPHFaceRecognizer lbph = new LBPHFaceRecognizer(Radius,Neighbours,GridX,GridY,Threshold);
                 try
                 {
-                    lbph.Load(dataDirectory + "/" + uid + ".lbph");
+                    lbph.Load(DataDirectory + "/" + uid + ".lbph");
                 }
                 catch (CvException)
                 {
                     continue;
                 }
                 FaceRecognizer.PredictionResult result = lbph.Predict(image);
-                if(result.Distance!=Double.MaxValue && (bestUID == -1 || result.Distance < bestDistance))
+                if(result.Distance!= double.MaxValue && (bestUID == -1 || result.Distance < bestDistance))
                 {
                     bestUID = result.Label;
                     bestDistance = result.Distance;
                 }
+                lbph.Dispose();
             }
             return bestUID;
         }
 
-        public void removeUserData(int userId)
+        public void RemoveUserData(int userId)
         {
-            File.Delete(dataDirectory + "/" + userId + ".lbph");
+            Directory.CreateDirectory(DataDirectory);
+            File.Delete(DataDirectory + "/" + userId + ".lbph");
         }
 
-        public void train(int userId, Mat image)
+        public void Train(int userId, Mat image)
         {
-            LBPHFaceRecognizer lbph =  new LBPHFaceRecognizer(radius, neighbours, gridX, gridY, threshold);
+            Directory.CreateDirectory(DataDirectory);
+            LBPHFaceRecognizer lbph =  new LBPHFaceRecognizer(Radius, Neighbours, GridX, GridY, Threshold);
             try
             {
-                lbph.Load(dataDirectory + "/" + userId + ".lbph");
+                lbph.Load(DataDirectory + "/" + userId + ".lbph");
             }
             catch(CvException)
             {
@@ -82,7 +87,8 @@ namespace FRLib
             VectorOfInt labels = new VectorOfInt();
             labels.Push(new int[] { userId });
             lbph.Update(images,labels);
-            lbph.Save(dataDirectory + "/" +userId + ".lbph");
+            lbph.Save(DataDirectory + "/" +userId + ".lbph");
+            lbph.Dispose();
         }
     }
 }
